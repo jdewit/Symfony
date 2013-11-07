@@ -51,6 +51,7 @@ class RouterApacheDumperCommand extends ContainerAwareCommand
             ->setDefinition(array(
                 new InputArgument('script_name', InputArgument::OPTIONAL, 'The script name of the application\'s front controller.'),
                 new InputOption('base-uri', null, InputOption::VALUE_REQUIRED, 'The base URI'),
+                new InputOption('path', 'p', InputOption::VALUE_REQUIRED, 'Dump routes to file path'),
             ))
             ->setDescription('Dumps all routes as Apache rewrite rules')
             ->setHelp(<<<EOF
@@ -81,6 +82,25 @@ EOF
 
         $dumper = new ApacheMatcherDumper($router->getRouteCollection());
 
-        $output->writeln($dumper->dump($dumpOptions), OutputInterface::OUTPUT_RAW);
+        $routes = $dumper->dump($dumpOptions);
+
+        if ($input->getOption('path')) {
+            $fs = $this->getContainer()->get('filesystem');
+            $path = $input->getOption('path');
+
+            $routes = <<<EOD
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    $routes
+
+</IfModule>
+EOD;
+
+            $fs->dumpFile('web/.htaccess', $routes);
+            $output->writeln(sprintf('Routes dumped to web/.htaccess', $path));
+        } else {
+            $output->writeln($routes, OutputInterface::OUTPUT_RAW);
+        }
     }
 }
